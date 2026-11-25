@@ -1,0 +1,6 @@
+{
+  "name": "christa-stamper-finance",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Invoicing, payment links, and the invoices/reminders dashboard for Christa Stamper Counseling — split out from the public marketing site repo so admin tooling deploys independently."
+}

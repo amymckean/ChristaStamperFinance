@@ -1,3 +1,10 @@
 [build]
   functions = "netlify/functions"
   edge_functions = "netlify/edge-functions"
+
+# dashboard.html's content now lives at "/" (index.html) — this keeps any
+# existing link or bookmark to /dashboard.html working.
+[[redirects]]
+  from = "/dashboard.html"
+  to = "/"
+  status = 301

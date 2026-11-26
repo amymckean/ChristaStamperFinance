@@ -21,7 +21,7 @@ password out of git.
   is a new password**, not the old one:
 
       Username: christa
-      Password: Kjml9bnUjYOwK8AfKNod
+      Password: Oaklynn262728!
 
   (Change it any time in Netlify's env vars — Christa doesn't need to know
   it's changeable, just give her the current one.)
@@ -65,7 +65,7 @@ password out of git.
    **Edge functions**, not just Builds/Functions, or the gate will 500):
 
    - `BASIC_AUTH_USER` = `christa`
-   - `BASIC_AUTH_PASS` = `Kjml9bnUjYOwK8AfKNod` (or your own choice)
+   - `BASIC_AUTH_PASS` = `Oaklynn262728!` (or your own choice)
 
    `STRIPE_WEBHOOK_SECRET` — see the Stripe step below; it gets a **new**
    value here, not copied from the old site.

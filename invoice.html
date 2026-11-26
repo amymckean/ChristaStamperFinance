@@ -367,14 +367,14 @@ function App() {
       {/* Header */}
       <div className="no-print" style={{ background: BRAND.card, borderBottom: `1px solid ${BRAND.border}`, padding: "0 32px" }}>
         <div style={{ maxWidth: 1020, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <a href="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none", color: "inherit" }}>
             <div style={{ width: 28, height: 28, background: BRAND.olive, borderRadius: "22%", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <svg viewBox="0 0 110 70" width="16" height="10"><path d="M5 65 L35 20 L50 40 L70 10 L105 65" fill="none" stroke="#FAF6F0" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </div>
             <span style={{ fontFamily: "Playfair Display, serif", fontWeight: 600, fontSize: 16 }}>Christa Stamper</span>
             <span style={{ color: BRAND.border, fontSize: 16, margin: "0 2px" }}>·</span>
             <span style={{ fontSize: 13, color: BRAND.umberSoft, fontWeight: 500 }}>Invoice Generator</span>
-          </div>
+          </a>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {[["edit","Edit"],["preview","Preview"],["settings","Settings"]].map(([id, label]) => (
               <button key={id} className={`tab-pill ${tab === id ? "tab-on" : "tab-off"}`} onClick={() => setTab(id)}>

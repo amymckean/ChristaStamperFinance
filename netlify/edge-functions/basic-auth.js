@@ -43,6 +43,8 @@ export default async (request, context) => {
 
 export const config = {
   path: [
+    "/",
+    "/index.html",
     "/invoice.html",
     "/dashboard.html",
     "/.netlify/functions/list-invoices",

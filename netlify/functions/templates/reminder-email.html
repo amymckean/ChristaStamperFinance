@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #F4EFE8; font-family: Georgia, 'Times New Roman', serif; }
+  .wrapper { max-width: 600px; margin: 32px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(61,53,44,0.10); }
+  .header { background: #6B7456; padding: 32px 40px; display: flex; align-items: center; gap: 14px; }
+  .header-name { color: #FAF6F0; font-size: 20px; font-weight: bold; letter-spacing: 0.01em; }
+  .header-title { color: rgba(250,246,240,0.7); font-size: 13px; font-family: Georgia, serif; margin-top: 2px; }
+  .body { padding: 36px 40px; }
+  .pill { display: inline-block; background: #F3E3DB; color: #A8623F; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.08em; padding: 6px 14px; border-radius: 100px; font-family: Arial, sans-serif; margin-bottom: 20px; }
+  .greeting { font-size: 16px; color: #3D352C; margin-bottom: 20px; line-height: 1.6; }
+  .invoice-meta { background: #FAF6F0; border-radius: 10px; padding: 18px 22px; margin-bottom: 28px; }
+  .meta-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(61,53,44,0.08); font-size: 14px; font-family: Arial, sans-serif; }
+  .meta-row:last-child { border-bottom: none; }
+  .meta-label { color: #6B6258; }
+  .meta-value { color: #3D352C; font-weight: bold; }
+  .meta-value.overdue { color: #A8623F; }
+  .total-row { display: flex; justify-content: flex-end; margin-bottom: 28px; }
+  .total-box { background: #FAF6F0; border-radius: 10px; padding: 16px 22px; text-align: right; min-width: 200px; }
+  .total-label { font-size: 11px; font-weight: bold; color: #6B6258; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; font-family: Arial, sans-serif; }
+  .total-amount { font-size: 28px; font-weight: bold; color: #3D352C; }
+  .payment-box { border: 2px solid #6B7456; border-radius: 10px; padding: 22px 24px; margin-bottom: 24px; }
+  .payment-title { font-size: 14px; font-weight: bold; color: #6B7456; margin-bottom: 16px; font-family: Arial, sans-serif; }
+  .payment-method { border: 1px solid rgba(61,53,44,0.15); border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
+  .payment-method:last-child { margin-bottom: 0; }
+  .payment-method-row { display: flex; justify-content: space-between; align-items: baseline; font-family: Arial, sans-serif; }
+  .payment-method-name { font-size: 13px; font-weight: bold; color: #3D352C; }
+  .payment-method-amount { font-size: 17px; font-weight: bold; color: #3D352C; }
+  .payment-method-note { font-size: 12px; color: #6B6258; font-family: Arial, sans-serif; margin-top: 2px; }
+  .payment-btn { display: inline-block; text-decoration: none; text-align: center; padding: 10px 22px; border-radius: 100px; font-size: 13px; font-weight: bold; font-family: Arial, sans-serif; margin-top: 12px; }
+  .payment-btn-card { background: #A8623F; color: #ffffff !important; }
+  .payment-btn-bank { background: #6B7456; color: #ffffff !important; }
+  .notes-box { background: #FAF6F0; border-radius: 10px; padding: 18px 22px; margin-bottom: 28px; font-size: 14px; color: #6B6258; line-height: 1.7; font-family: Arial, sans-serif; }
+  .divider { border: none; border-top: 1px solid rgba(61,53,44,0.12); margin: 0 0 24px; }
+  .footer { padding: 24px 40px; background: #6B7456; }
+  .footer-name { color: #FAF6F0; font-size: 15px; font-weight: bold; font-family: Georgia, serif; margin-bottom: 4px; }
+  .footer-detail { color: rgba(250,246,240,0.8); font-size: 13px; font-family: Arial, sans-serif; line-height: 1.8; }
+  .footer-detail a { color: #FAF6F0; text-decoration: none; }
+  .footer-closing { color: rgba(250,246,240,0.6); font-size: 11px; font-family: Arial, sans-serif; margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Header -->
+  <div class="header">
+    <div style="width:40px;height:40px;background:rgba(250,246,240,0.15);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg viewBox="0 0 110 70" width="22" height="14">
+        <path d="M5 65 L35 20 L50 40 L70 10 L105 65" fill="none" stroke="#FAF6F0" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div>
+      <div class="header-name">Christa Stamper</div>
+      <div class="header-title">Biblical Counselor</div>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="body">
+
+    <span class="pill">Payment reminder</span>
+
+    <p class="greeting">Dear {{to_name}},<br><br>
+    I hope this note finds you well. I wanted to follow up regarding invoice <strong>{{invoice_number}}</strong> for biblical counseling services, which has not yet been received. It has now been {{days_overdue}} days since the due date. I've included the details below. If payment has already been sent, thank you. I truly appreciate it, and please disregard this note.</p>
+
+    <div class="invoice-meta">
+      <div class="meta-row"><span class="meta-label">Invoice</span><span class="meta-value">{{invoice_number}}</span></div>
+      <div class="meta-row"><span class="meta-label">Issued</span><span class="meta-value">{{issue_date}}</span></div>
+      <div class="meta-row"><span class="meta-label">Due</span><span class="meta-value">{{due_date}}</span></div>
+      <div class="meta-row"><span class="meta-label">Billed to</span><span class="meta-value">{{church_name}}</span></div>
+    </div>
+
+    <div class="total-row">
+      <div class="total-box">
+        <div class="total-label">Amount due</div>
+        <div class="total-amount">{{amount_due}}</div>
+      </div>
+    </div>
+
+    <div class="payment-box">
+      <div class="payment-title">How to pay</div>
+
+      <div class="payment-method">
+        <div class="payment-method-row">
+          <span class="payment-method-name">Card</span>
+          <span class="payment-method-amount">{{card_total}}</span>
+        </div>
+        <div class="payment-method-note">Includes {{card_fee}} processing fee (2.9% + $0.30)</div>
+        <a href="{{card_link}}" class="payment-btn payment-btn-card">Pay by card →</a>
+      </div>
+
+      <div class="payment-method">
+        <div class="payment-method-row">
+          <span class="payment-method-name">Bank transfer (ACH)</span>
+          <span class="payment-method-amount">{{ach_total}}</span>
+        </div>
+        <div class="payment-method-note">No processing fee</div>
+        <div class="payment-method-note" style="margin-top:6px;"><strong>Preferred:</strong> click below, then search for and log in to your bank to connect it instantly. This is the fastest option and needs no further steps.</div>
+        <div class="payment-method-note" style="margin-top:6px;">If your bank isn't listed, choose "Enter bank details manually" instead. It takes three steps, and it's easy to stop too soon:</div>
+        <div class="payment-method-note" style="margin-top:6px;">1. Enter your routing number and account number (twice, to confirm), then click <strong>Submit</strong>.<br>
+        2. You'll see a "One more step" screen. This is <strong>not</strong> the end. Click <strong>Continue to Christa Stamper Biblical Counseling</strong> to go back and finish.<br>
+        3. On the page that follows, enter your email and click <strong>Start payment</strong>. This is what actually authorizes the transfer.</div>
+        <div class="payment-method-note" style="margin-top:6px;">After that, your bank will verify two small test deposits, which can take one to two business days to appear. Watch for a follow-up email with instructions to confirm those amounts. No bank details are shared with us directly.</div>
+        <a href="{{bank_link}}" class="payment-btn payment-btn-bank">Pay by bank transfer →</a>
+      </div>
+    </div>
+
+    <div class="notes-box">{{notes}}</div>
+
+    <hr class="divider">
+
+    <p style="font-size:13px;color:#6B6258;font-family:Arial,sans-serif;line-height:1.6;">
+      If you have any questions, or need a bit more time, please don't hesitate to reply to this email. I'm always glad to help. You're also welcome to visit
+      <a href="https://christastamper.com" style="color:#854A30;text-decoration:none;">christastamper.com</a>.
+    </p>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-name">Christa Stamper</div>
+    <div class="footer-detail">
+      Biblical Counselor<br>
+      <a href="mailto:christa@christastamper.com">christa@christastamper.com</a><br>
+      <a href="https://christastamper.com">christastamper.com</a>
+    </div>
+    <div class="footer-closing">Thank you for your partnership.</div>
+  </div>
+
+</div>
+</body>
+</html>

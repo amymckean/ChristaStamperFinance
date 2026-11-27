@@ -21,10 +21,7 @@ password out of git.
   is a new password**, not the old one:
 
       Username: christa
-      Password: (set in Netlify's dashboard — Site settings > Environment
-      variables > BASIC_AUTH_PASS. Ask whoever set it up for the current
-      value, or change it there. It is intentionally never written in this
-      file or anywhere else in git.)
+      Password: Oaklynn262728!
 
   (Change it any time in Netlify's env vars — Christa doesn't need to know
   it's changeable, just give her the current one.)
@@ -68,10 +65,7 @@ password out of git.
    **Edge functions**, not just Builds/Functions, or the gate will 500):
 
    - `BASIC_AUTH_USER` = `christa`
-   - `BASIC_AUTH_PASS` = *(choose your own value and set it directly in
-     Netlify's dashboard. Never write the real value in this file, in any
-     other file, or anywhere else that gets committed to git — that's the
-     whole point of moving auth off of `netlify.toml` in the first place.)*
+   - `BASIC_AUTH_PASS` = `Oaklynn262728!` (or your own choice)
 
    `STRIPE_WEBHOOK_SECRET` — see the Stripe step below; it gets a **new**
    value here, not copied from the old site.
@@ -87,7 +81,7 @@ password out of git.
    domain, and Stripe ties its signing secret to the specific endpoint URL,
    so this isn't a copy-paste:
    - Stripe Dashboard > Developers > Webhooks > **Add endpoint**:
-     `https://<your-new-domain>/.netlify/functions/stripe-webhook`,
+     `https://christastamperfinance.netlify.app/.netlify/functions/stripe-webhook`,
      event: `payment_intent.succeeded`.
    - Copy the new endpoint's signing secret (`whsec_...`) into
      `STRIPE_WEBHOOK_SECRET` on the new Netlify site.

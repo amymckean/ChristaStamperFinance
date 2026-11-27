@@ -2,6 +2,13 @@
   functions = "netlify/functions"
   edge_functions = "netlify/edge-functions"
 
+# send-invoice-email.js and send-reminder-now.js load their HTML from
+# netlify/functions/templates/*.html at runtime via fs.readFileSync — make
+# sure Netlify's function bundler ships those files alongside the functions
+# rather than tree-shaking them out as "unused" static assets.
+[functions]
+  included_files = ["netlify/functions/templates/*.html"]
+
 # dashboard.html's content now lives at "/" (index.html) — this keeps any
 # existing link or bookmark to /dashboard.html working.
 [[redirects]]

@@ -84,6 +84,9 @@ Questions? Reply to this email or visit ${PROVIDER.website}`;
 // returns null instead of throwing, which is why PDF attachments went
 // missing with no error in the console. "datauristring" is a real output
 // type; stripping its "data:...;base64," prefix gives the same thing.
+//
+// Styled to match the invoice/reminder email templates: same brand colors,
+// header/footer bands, meta box, and "How to pay" buttons.
 function buildInvoicePdf(data) {
   const {
     invoiceNumber, issueDate, dueDate, church, contactName, lines, notes,
@@ -91,142 +94,323 @@ function buildInvoicePdf(data) {
     detailed, cardLink, bankLink, manualBankInfo,
   } = data;
   const { jsPDF } = window.jspdf;
+
+  // Brand colors, matched to the email templates' CSS.
+  const C = {
+    header: [107, 116, 86],      // #6B7456 olive
+    cream: [250, 246, 240],      // #FAF6F0
+    dark: [61, 53, 44],          // #3D352C
+    muted: [107, 98, 88],        // #6B6258
+    card: [168, 98, 63],         // #A8623F terracotta (card payment button)
+    border: [224, 219, 209],     // ~rgba(61,53,44,0.15) over white
+    borderFaint: [236, 232, 225],// ~rgba(61,53,44,0.08) over white
+    white: [255, 255, 255],
+  };
+
+  // Short form for the line-items table, where a full "November 27, 2026" is
+  // too wide for the column. Helvetica's base encoding also has no "→" glyph
+  // (it renders as "!'"), so buttons use a plain ">" instead.
+  function shortDate(s) {
+    if (!s) return "";
+    return new Date(s + "T00:00:00").toLocaleDateString("en-US");
+  }
+
   const doc = new jsPDF({ unit: "pt", format: "letter" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const marginX = 50;
   const rightX = pageW - marginX;
-  let y = 56;
+  const contentW = pageW - marginX * 2;
+  let y = 0;
 
+  // If a block won't fit before the bottom margin, start a fresh page BEFORE
+  // drawing it, repainting nothing above — content never splits mid-block.
   function ensureSpace(next) {
-    if (y + next > pageH - 56) { doc.addPage(); y = 56; }
+    if (y + next > pageH - 40) { doc.addPage(); y = 40; }
   }
 
-  doc.setFont("helvetica", "bold"); doc.setFontSize(20); doc.setTextColor(0);
-  doc.text(PROVIDER.name, marginX, y);
-  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-  doc.text(PROVIDER.title, marginX, y + 14);
-  doc.text(`${PROVIDER.email}  ·  ${PROVIDER.website}`, marginX, y + 27);
+  function fill(c) { doc.setFillColor(c[0], c[1], c[2]); }
+  function draw(c) { doc.setDrawColor(c[0], c[1], c[2]); }
+  function textColor(c) { doc.setTextColor(c[0], c[1], c[2]); }
 
-  doc.setFont("helvetica", "bold"); doc.setFontSize(14);
-  doc.text(`Invoice ${invoiceNumber}`, rightX, y, { align: "right" });
-  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-  doc.text(`Issued: ${fmtDate(issueDate)}`, rightX, y + 16, { align: "right" });
-  doc.text(`Due: ${fmtDate(dueDate)}`, rightX, y + 29, { align: "right" });
+  // ---------- Header band ----------
+  const headerH = 70;
+  fill(C.header);
+  doc.rect(0, 0, pageW, headerH, "F");
+  textColor(C.cream);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(19);
+  doc.text(PROVIDER.name, marginX, 38);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10.5);
+  doc.setTextColor(235, 230, 220);
+  doc.text(PROVIDER.title, marginX, 54);
 
-  y += 56;
-  doc.setDrawColor(200);
-  doc.line(marginX, y, rightX, y);
-  y += 24;
+  doc.setFont("helvetica", "bold"); doc.setFontSize(13);
+  textColor(C.cream);
+  doc.text(`Invoice ${invoiceNumber}`, rightX, 32, { align: "right" });
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
+  doc.setTextColor(225, 219, 208);
+  doc.text(`Issued: ${fmtDate(issueDate)}`, rightX, 46, { align: "right" });
+  doc.text(`Due: ${fmtDate(dueDate)}`, rightX, 58, { align: "right" });
 
-  doc.setFont("helvetica", "bold"); doc.setFontSize(9);
-  doc.text("BILL TO", marginX, y);
-  y += 14;
-  doc.setFont("helvetica", "normal"); doc.setFontSize(11);
-  doc.text(church || "", marginX, y);
-  if (contactName) { y += 14; doc.text(contactName, marginX, y); }
-  y += 26;
+  y = headerH + 34;
 
+  // ---------- Meta box ----------
+  const metaRows = [
+    ["Invoice", invoiceNumber],
+    ["Issued", fmtDate(issueDate)],
+    ["Due", fmtDate(dueDate)],
+    ["Billed to", [contactName, church].filter(Boolean).join(" — ") || church || ""],
+  ];
   if (previousBalanceAmount > 0) {
-    doc.setFont("helvetica", "bold"); doc.setFontSize(10);
-    doc.text("Previous balance" + (previousBalanceNote ? ` (${previousBalanceNote})` : ""), marginX, y);
-    doc.text(fmt$(previousBalanceAmount), rightX, y, { align: "right" });
-    y += 22;
+    metaRows.push([
+      "Previous balance" + (previousBalanceNote ? ` (${previousBalanceNote})` : ""),
+      fmt$(previousBalanceAmount),
+    ]);
   }
+  // A long church/contact name can wrap the value onto a second line, so
+  // measure each row's actual height (at the bold 10pt it's drawn at)
+  // instead of assuming one fixed row height for all of them.
+  const metaValueW = contentW * 0.52;
+  doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+  const metaRowsMeasured = metaRows.map(([label, value]) => {
+    const valueLines = doc.splitTextToSize(String(value), metaValueW);
+    return { label, valueLines, h: Math.max(1, valueLines.length) * 13 + 9 };
+  });
+  const metaPadY = 14;
+  const metaH = metaPadY * 2 + metaRowsMeasured.reduce((sum, r) => sum + r.h, 0);
+  ensureSpace(metaH);
+  fill(C.cream);
+  doc.roundedRect(marginX, y, contentW, metaH, 8, 8, "F");
+  let my = y + metaPadY + 11;
+  metaRowsMeasured.forEach((r, i) => {
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    textColor(C.muted);
+    doc.text(r.label, marginX + 18, my, { maxWidth: contentW * 0.4 });
+    doc.setFont("helvetica", "bold");
+    textColor(C.dark);
+    r.valueLines.forEach((ln, j) => doc.text(ln, rightX - 18, my + j * 13, { align: "right" }));
+    const rowBottom = my + (r.valueLines.length - 1) * 13 + 9;
+    if (i < metaRowsMeasured.length - 1) {
+      draw(C.borderFaint);
+      doc.setLineWidth(0.75);
+      doc.line(marginX + 18, rowBottom, rightX - 18, rowBottom);
+    }
+    my += r.h;
+  });
+  y += metaH + 28;
+
+  // ---------- Line items ----------
+  ensureSpace(40);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+  textColor(C.muted);
+  doc.text("SERVICES", marginX, y);
+  y += 14;
 
   const cols = detailed
     ? [
         { k: "date", label: "Date", x: marginX },
-        { k: "counselee", label: "Counselee", x: marginX + 64 },
-        { k: "description", label: "Description", x: marginX + 158, w: 190 },
+        { k: "counselee", label: "Counselee", x: marginX + 72, w: 86 },
+        { k: "description", label: "Description", x: marginX + 166, w: 162 },
         { k: "sessions", label: "Sessions", x: rightX - 140, align: "right" },
         { k: "rate", label: "Rate", x: rightX - 90, align: "right" },
         { k: "amount", label: "Amount", x: rightX, align: "right" },
       ]
     : [
-        { k: "counselee", label: "Counselee", x: marginX },
-        { k: "description", label: "Description", x: marginX + 94, w: 254 },
+        { k: "counselee", label: "Counselee", x: marginX, w: 86 },
+        { k: "description", label: "Description", x: marginX + 94, w: 236 },
         { k: "sessions", label: "Sessions", x: rightX - 140, align: "right" },
         { k: "rate", label: "Rate", x: rightX - 90, align: "right" },
         { k: "amount", label: "Amount", x: rightX, align: "right" },
       ];
+  const descCol = cols.find(c => c.k === "description");
 
-  doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-  cols.forEach(c => doc.text(c.label.toUpperCase(), c.x, y, c.align ? { align: c.align } : {}));
-  y += 6;
-  doc.setDrawColor(220);
-  doc.line(marginX, y, rightX, y);
-  y += 14;
+  function drawTableHeader() {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8);
+    textColor(C.muted);
+    cols.forEach(c => doc.text(c.label.toUpperCase(), c.x, y, c.align ? { align: c.align } : {}));
+    y += 7;
+    draw(C.border);
+    doc.setLineWidth(1);
+    doc.line(marginX, y, rightX, y);
+    y += 16;
+  }
+  drawTableHeader();
 
-  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-  lines.forEach(l => {
-    ensureSpace(32);
+  (lines || []).forEach(l => {
+    // Measure wrapping up front (both the description, which can wrap on
+    // its own, and the per-line note) so the row's height — and the page-
+    // break decision — account for every wrapped line, not just one.
+    // splitTextToSize measures using whatever font/size is CURRENTLY set on
+    // the doc, so it must match the size each piece is actually drawn at —
+    // otherwise it wraps against the wrong character widths and overflows.
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    const descLines = doc.splitTextToSize(l.description || "", descCol.w || 220);
+    doc.setFont("helvetica", "italic"); doc.setFontSize(8.5);
+    const noteLines = l.notes ? doc.splitTextToSize(l.notes, descCol.w || 220) : [];
+    const descH = Math.max(1, descLines.length) * 12.5;
+    const noteH = noteLines.length ? noteLines.length * 12 + 4 : 0;
+    const rowH = descH + noteH + 8;
+    // A row (plus its note) never splits across pages: if it doesn't fit,
+    // start a new page and repeat the column headers there.
+    if (y + rowH > pageH - 40) {
+      doc.addPage();
+      y = 40;
+      drawTableHeader();
+    }
+    const rowTopY = y;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    textColor(C.dark);
     cols.forEach(c => {
+      if (c.k === "description") return; // drawn separately below, line by line
       let val = "";
-      if (c.k === "date") val = l.date ? fmtDate(l.date) : "";
+      if (c.k === "date") val = l.date ? shortDate(l.date) : "";
       else if (c.k === "counselee") val = l.counselee || "";
-      else if (c.k === "description") val = l.description || "";
       else if (c.k === "sessions") val = String(l.sessions || "");
       else if (c.k === "rate") val = fmt$(l.rate);
       else if (c.k === "amount") val = fmt$(l.amount);
-      doc.text(val, c.x, y, c.align ? { align: c.align } : (c.w ? { maxWidth: c.w } : {}));
+      doc.setFont("helvetica", c.k === "amount" ? "bold" : "normal");
+      doc.text(val, c.x, rowTopY, c.align ? { align: c.align } : {});
     });
-    y += 14;
-    if (l.notes) {
-      doc.setFont("helvetica", "italic"); doc.setFontSize(8.5); doc.setTextColor(120);
-      doc.text(l.notes, cols.find(c => c.k === "description").x, y, { maxWidth: 220 });
-      doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(0);
-      y += 13;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    textColor(C.dark);
+    descLines.forEach((ln, i) => doc.text(ln, descCol.x, rowTopY + i * 12.5));
+    y = rowTopY + descH;
+    if (noteLines.length) {
+      doc.setFont("helvetica", "italic"); doc.setFontSize(8.5);
+      textColor(C.muted);
+      noteLines.forEach(ln => { doc.text(ln, descCol.x, y, { maxWidth: descCol.w }); y += 12; });
+      y += 4;
     }
     y += 8;
+    draw(C.borderFaint);
+    doc.setLineWidth(0.75);
+    doc.line(marginX, y - 4, rightX, y - 4);
   });
 
-  y += 6;
-  doc.setDrawColor(200);
-  doc.line(marginX, y, rightX, y);
+  y += 14;
+
+  // ---------- Total box ----------
+  ensureSpace(80);
+  const totalBoxW = 200, totalBoxH = 58;
+  fill(C.cream);
+  doc.roundedRect(rightX - totalBoxW, y, totalBoxW, totalBoxH, 8, 8, "F");
+  doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+  textColor(C.muted);
+  doc.text("AMOUNT DUE", rightX - 16, y + 20, { align: "right" });
+  doc.setFontSize(22);
+  textColor(C.dark);
+  doc.text(fmt$(subtotal), rightX - 16, y + 45, { align: "right" });
+  y += totalBoxH + 24;
+
+  // ---------- Payment box ----------
+  function paymentMethodBlock(y0, title, amountText, noteText, linkUrl, btnLabel, btnColor) {
+    const padX = 16, padTop = 14;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
+    const noteLines = doc.splitTextToSize(noteText, contentW - 2 * padX - 32);
+    const h = padTop + 16 + (noteLines.length * 11) + 10 + 26 + 12;
+    draw(C.border);
+    doc.setLineWidth(1);
+    doc.roundedRect(marginX, y0, contentW - 32, h, 6, 6, "S");
+    let ly = y0 + padTop + 4;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10.5);
+    textColor(C.dark);
+    doc.text(title, marginX + padX, ly);
+    doc.setFontSize(12.5);
+    doc.text(amountText, rightX - padX - 32, ly, { align: "right" });
+    ly += 14;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
+    textColor(C.muted);
+    noteLines.forEach(ln => { doc.text(ln, marginX + padX, ly); ly += 11; });
+    ly += 8;
+    // Button (also a real clickable link annotation)
+    const btnW = 150, btnH = 22;
+    fill(btnColor);
+    doc.roundedRect(marginX + padX, ly, btnW, btnH, 11, 11, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9.5);
+    textColor(C.white);
+    doc.text(btnLabel, marginX + padX + btnW / 2, ly + 14.5, { align: "center" });
+    if (linkUrl) doc.link(marginX + padX, ly, btnW, btnH, { url: linkUrl });
+    return h;
+  }
+
+  function measurePaymentBlock(noteText) {
+    const padX = 16, padTop = 14;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
+    const noteLines = doc.splitTextToSize(noteText, contentW - 2 * padX - 32);
+    return padTop + 16 + (noteLines.length * 11) + 10 + 26 + 12;
+  }
+
+  const cardBlockH = measurePaymentBlock(`Includes ${fmt$(cardFee)} processing fee (2.9% + $0.30)`);
+  const bankBlockH = measurePaymentBlock("No processing fee");
+  ensureSpace(16 + cardBlockH + 10 + bankBlockH);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+  textColor(C.header);
+  doc.text("How to pay", marginX, y);
+  y += 16;
+
+  paymentMethodBlock(
+    y, "Card", fmt$(cardTotal),
+    `Includes ${fmt$(cardFee)} processing fee (2.9% + $0.30)`,
+    cardLink, "Pay by card >", C.card
+  );
+  y += cardBlockH + 10;
+
+  paymentMethodBlock(
+    y, "Bank transfer (ACH)", fmt$(achTotal), "No processing fee",
+    bankLink, "Pay by bank transfer >", C.header
+  );
+  y += bankBlockH;
+
+  if ((manualBankInfo || "").trim()) {
+    y += 10;
+    const padX = 16;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
+    const noteLines = doc.splitTextToSize(manualBankInfo, contentW - 2 * padX - 32);
+    const h = 14 + 14 + noteLines.length * 11 + 10;
+    ensureSpace(h);
+    draw(C.border); doc.setLineWidth(1);
+    doc.roundedRect(marginX, y, contentW - 32, h, 6, 6, "S");
+    let ly = y + 18;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10.5);
+    textColor(C.dark);
+    doc.text("Bank transfer (manual)", marginX + padX, ly);
+    ly += 14;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
+    textColor(C.muted);
+    noteLines.forEach(ln => { doc.text(ln, marginX + padX, ly); ly += 11; });
+    y += h;
+  }
   y += 24;
 
-  ensureSpace(90);
-  doc.setFont("helvetica", "bold"); doc.setFontSize(9);
-  doc.text("AMOUNT DUE", rightX, y, { align: "right" });
-  y += 18;
-  doc.setFontSize(18);
-  doc.text(fmt$(subtotal), rightX, y, { align: "right" });
-  y += 20;
-  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-  doc.text(`If paying by card: ${fmt$(cardTotal)} (includes ${fmt$(cardFee)} fee)`, rightX, y, { align: "right" });
-  y += 14;
-  doc.text(`If paying by bank transfer: ${fmt$(achTotal)} (no fee)`, rightX, y, { align: "right" });
-  y += 26;
-
-  if (cardLink) {
-    ensureSpace(20);
-    doc.setTextColor(40, 90, 160);
-    doc.textWithLink(`Pay by card → ${fmt$(cardTotal)}`, marginX, y, { url: cardLink });
-    doc.setTextColor(0);
-    y += 18;
-  }
-  if (bankLink) {
-    ensureSpace(20);
-    doc.setTextColor(40, 90, 160);
-    doc.textWithLink(`Pay by bank transfer → ${fmt$(achTotal)}`, marginX, y, { url: bankLink });
-    doc.setTextColor(0);
-    y += 18;
-  }
-  if ((manualBankInfo || "").trim()) {
-    ensureSpace(40);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90);
-    doc.splitTextToSize(manualBankInfo, pageW - marginX * 2).forEach(ln => { ensureSpace(14); doc.text(ln, marginX, y); y += 12; });
-    doc.setTextColor(0);
-    y += 10;
-  }
-
+  // ---------- Notes box ----------
   if (notes) {
-    ensureSpace(40);
-    doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(90);
-    doc.splitTextToSize(notes, pageW - marginX * 2).forEach(ln => { ensureSpace(14); doc.text(ln, marginX, y); y += 12; });
-    doc.setTextColor(0);
+    const padX = 18, padY = 14;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
+    const noteLines = doc.splitTextToSize(notes, contentW - 2 * padX);
+    const h = padY * 2 + noteLines.length * 13;
+    ensureSpace(h);
+    fill(C.cream);
+    doc.roundedRect(marginX, y, contentW, h, 8, 8, "F");
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9.5);
+    textColor(C.muted);
+    let ly = y + padY + 9;
+    noteLines.forEach(ln => { doc.text(ln, marginX + padX, ly); ly += 13; });
+    y += h + 24;
   }
+
+  // ---------- Footer band ----------
+  ensureSpace(58);
+  fill(C.header);
+  doc.rect(0, y, pageW, 58, "F");
+  doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+  textColor(C.cream);
+  doc.text(PROVIDER.name, marginX, y + 22);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
+  doc.setTextColor(225, 219, 208);
+  doc.text(`${PROVIDER.title}  ·  ${PROVIDER.email}  ·  ${PROVIDER.website}`, marginX, y + 36);
+  doc.setFontSize(8);
+  doc.setTextColor(205, 198, 184);
+  doc.text("Thank you for your partnership.", marginX, y + 49);
 
   const dataUri = doc.output("datauristring");
   const commaIdx = dataUri.indexOf(",");

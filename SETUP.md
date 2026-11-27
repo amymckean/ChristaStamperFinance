@@ -21,17 +21,31 @@ password out of git.
   is a new password**, not the old one:
 
       Username: christa
-      Password: Oaklynn262728!
+      Password: (set in Netlify's dashboard — Site settings > Environment
+      variables > BASIC_AUTH_PASS. Ask whoever set it up for the current
+      value, or change it there. It is intentionally never written in this
+      file or anywhere else in git.)
 
   (Change it any time in Netlify's env vars — Christa doesn't need to know
-  it's changeable, just give her the current one.)
+  it's changeable, just give her the current one. **Never paste the real
+  password into this file, or anywhere else in this repo, when following
+  these steps** — type it only into Netlify's own dashboard. This file
+  already leaked a real password once; don't let it happen again.)
 
 - **Two new functions** power the dashboard: `list-invoices.js` (reads the
   sheet) and `update-invoice.js` (marks an invoice Paid/Unpaid, edits a due
   date). A third, `send-reminder-now.js`, sends one reminder email on demand
-  — the same EmailJS template the daily Apps Script job uses — and updates
-  `reminder_sent_on` so the Apps Script job's normal 7-day pacing picks up
-  from there instead of firing again right away.
+  — through the same Resend account the daily Apps Script job uses — and
+  updates `reminder_sent_on` so the Apps Script job's normal 7-day pacing
+  picks up from there instead of firing again right away.
+
+- **Email sending moved from EmailJS to [Resend](https://resend.com).**
+  EmailJS's free plan can't attach a PDF to an email at all, and upgrading
+  wasn't wanted, so invoice emails (`send-invoice-email.js`) and reminder
+  emails (`send-reminder-now.js`, and `ReminderEmails.gs` in Apps Script)
+  now build their own HTML (from `netlify/functions/templates/*.html`) and
+  send through Resend's API instead of an EmailJS dashboard template. See
+  the `RESEND_API_KEY` step below for the one-time setup this needs.
 
 - `create-payment-link.js`, `stripe-webhook.js`, and `add-invoice-row.js`
   moved over unchanged.
@@ -54,18 +68,37 @@ password out of git.
    - `GOOGLE_SHEET_ID`
    - `STRIPE_SECRET_KEY`
 
-   These two are **new** — they weren't Netlify env vars before, only Apps
-   Script Script Properties (Apps Script editor > Project Settings > Script
-   Properties). Copy the same values from there:
+   This one is **new** — invoices and reminders send through
+   [Resend](https://resend.com) now, not EmailJS:
 
-   - `EMAILJS_PUBLIC_KEY`
-   - `EMAILJS_PRIVATE_KEY`
+   - `RESEND_API_KEY` — Resend dashboard > API Keys > Create API Key.
+
+   Before Resend can deliver to anyone besides your own Resend account
+   email, verify a sending domain: Resend dashboard > Domains > Add Domain
+   (e.g. `christastamper.com`), then add the DNS records it gives you
+   wherever christastamper.com's DNS is managed — the same place you'll add
+   the CNAME for the custom domain in step 3 below. Until that domain shows
+   "Verified" in Resend, sends only reach the Resend account's own address.
+   The `FROM_EMAIL` constant near the top of
+   `netlify/functions/send-invoice-email.js` and
+   `netlify/functions/send-reminder-now.js` (currently
+   `invoices@christastamper.com`) must use that verified domain — update
+   both files together if you use a different address.
+
+   **EmailJS is no longer used anywhere in this app.** If you still have
+   `EMAILJS_PUBLIC_KEY` / `EMAILJS_PRIVATE_KEY` set on this Netlify site, or
+   as Apps Script Script Properties for `ReminderEmails.gs`, they're safe to
+   delete once you've confirmed sending works through Resend — nothing
+   reads them anymore.
 
    And set these two new ones for the auth gate (scope them to include
    **Edge functions**, not just Builds/Functions, or the gate will 500):
 
    - `BASIC_AUTH_USER` = `christa`
-   - `BASIC_AUTH_PASS` = `Oaklynn262728!` (or your own choice)
+   - `BASIC_AUTH_PASS` = *(choose your own value and type it directly into
+     Netlify's dashboard — never into this file, or any other file in this
+     repo. This field has already leaked a real password into git history
+     once; whatever you set here now, set it ONLY in Netlify's UI.)*
 
    `STRIPE_WEBHOOK_SECRET` — see the Stripe step below; it gets a **new**
    value here, not copied from the old site.

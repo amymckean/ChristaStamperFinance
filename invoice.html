@@ -395,6 +395,7 @@ function App() {
       // Keep sending the email even if the PDF fails to build — no attachment
       // beats no invoice at all.
     }
+    console.log("[DEBUG] invoicePdfBase64 length:", invoicePdfBase64.length, "pdfFailed:", pdfFailed);
 
     try {
       const sendRes = await fetch("/.netlify/functions/send-invoice-email", {

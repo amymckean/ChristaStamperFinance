@@ -386,10 +386,12 @@ function App() {
     const invoiceText = buildInvoiceText({ invoiceNumber, issueDate, dueDate, church, contactName, lines, notes, subtotal, cardFee, cardTotal, achTotal, previousBalanceAmount, previousBalanceNote });
 
     let invoicePdfBase64 = "";
+    let pdfFailed = false;
     try {
       invoicePdfBase64 = buildInvoicePdf({ invoiceNumber, issueDate, dueDate, church, contactName, lines, notes, subtotal, cardFee, cardTotal, achTotal, previousBalanceAmount, previousBalanceNote, detailed, cardLink: finalCardLink, bankLink: finalBankLink, manualBankInfo });
     } catch (pdfErr) {
       console.error("Failed to generate the PDF attachment:", pdfErr);
+      pdfFailed = true;
       // Keep sending the email even if the PDF fails to build — no attachment
       // beats no invoice at all.
     }
@@ -430,6 +432,9 @@ function App() {
       }
       setSendState("sent");
       setTimeout(() => setSendState("idle"), 4000);
+      if (pdfFailed) {
+        setSendError("Invoice sent, but the PDF attachment failed to generate — open the browser console (look for \"Failed to generate the PDF attachment\") for details, then try sending again.");
+      }
 
       // Best-effort: keep the Invoices tracking sheet in sync so the reminder
       // script and the Stripe webhook can find this invoice later. A failure
@@ -461,7 +466,12 @@ function App() {
         }
       } catch (syncErr) {
         console.error("Failed to sync invoice to the tracking sheet:", syncErr);
-        setSendError("Invoice sent, but the tracking sheet couldn't be updated automatically — add this invoice to the sheet by hand so reminders pick it up.");
+        setSendError(
+          (pdfFailed
+            ? "Invoice sent, but the PDF attachment failed to generate, and the "
+            : "Invoice sent, but the ") +
+          "tracking sheet couldn't be updated automatically — add this invoice to the sheet by hand so reminders pick it up."
+        );
       }
     } catch (err) {
       setSendState("error");

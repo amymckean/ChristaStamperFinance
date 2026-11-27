@@ -79,6 +79,11 @@ Questions? Reply to this email or visit ${PROVIDER.website}`;
 
 // Builds a one-page PDF of the invoice (base64, no data-URI prefix) so it can
 // be sent as an email attachment via Resend. Requires jsPDF (loaded above).
+//
+// NOTE: jsPDF has no "base64" output type — doc.output("base64") silently
+// returns null instead of throwing, which is why PDF attachments went
+// missing with no error in the console. "datauristring" is a real output
+// type; stripping its "data:...;base64," prefix gives the same thing.
 function buildInvoicePdf(data) {
   const {
     invoiceNumber, issueDate, dueDate, church, contactName, lines, notes,
@@ -223,7 +228,9 @@ function buildInvoicePdf(data) {
     doc.setTextColor(0);
   }
 
-  return doc.output("base64");
+  const dataUri = doc.output("datauristring");
+  const commaIdx = dataUri.indexOf(",");
+  return commaIdx === -1 ? dataUri : dataUri.slice(commaIdx + 1);
 }
 
 function App() {
@@ -395,7 +402,6 @@ function App() {
       // Keep sending the email even if the PDF fails to build — no attachment
       // beats no invoice at all.
     }
-    console.log("[DEBUG] invoicePdfBase64 length:", invoicePdfBase64.length, "pdfFailed:", pdfFailed);
 
     try {
       const sendRes = await fetch("/.netlify/functions/send-invoice-email", {
